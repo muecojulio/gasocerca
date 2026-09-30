@@ -1,5 +1,5 @@
-const CACHE = "gasocerca-v2";
-const PRECACHE = ["/", "/instalar", "/privacidad", "/manifest.json", "/icon-192.png", "/icon-512.png"];
+const CACHE = "gasocerca-v3";
+const PRECACHE = ["/", "/instalar", "/privacidad", "/manifest.json", "/icon-192.svg", "/icon-512.svg", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)));
