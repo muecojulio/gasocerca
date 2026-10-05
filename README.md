@@ -1,6 +1,6 @@
 # GasoCerca
 
-App para encontrar gasolineras en México y comparar Regular, Premium y Diésel con datos de la CNE.
+App para encontrar gasolineras en México y comparar gasolina Magna (tipo CNE `regular`) y Premium con datos de la CNE. Diésel no está disponible.
 
 ## Qué hace
 
