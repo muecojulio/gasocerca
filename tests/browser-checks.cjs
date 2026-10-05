@@ -30,7 +30,7 @@ async function fixturePage(browser, settings={}) {
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   const calls = [];
-  const mode = {stationsError:false, slowDiesel:false, searchErrorCount:0, routeError:false};
+  const mode = {stationsError:false, slowPremium:false, searchErrorCount:0, routeError:false};
   await page.route('https://fonts.googleapis.com/**', route=>route.fulfill({contentType:'text/css',body:''}));
   await page.route('https://fonts.gstatic.com/**', route=>route.abort());
   await page.route('https://unpkg.com/leaflet@1.9.4/dist/**', route=>{
@@ -43,9 +43,9 @@ async function fixturePage(browser, settings={}) {
   await page.route('https://api.qrserver.com/**', route=>route.fulfill({contentType:'image/png',body:png}));
   function stationsFor(lat,lng,tipo='regular') {
     const stations = [
-      {id:'a', name:'Servicio Centro',cre:'PL/001',lat:lat+.001,lng:lng+.001,regular:25.1,premium:27.2,diesel:26.3,distance:1.2,desvioKm:.8},
-      {id:'b', name:'Estación Ahorro',cre:'PL/002',lat:lat+.005,lng:lng+.002,regular:23.45,premium:26.2,diesel:25.4,distance:3.1,desvioKm:.5},
-      {id:'c', name:'Gasolinera Ruta',cre:'PL/003',lat:lat+.008,lng:lng+.004,regular:24.3,premium:25.3,diesel:24.2,distance:4.6,desvioKm:1.1},
+      {id:'a', name:'Servicio Centro',cre:'PL/001',lat:lat+.001,lng:lng+.001,regular:25.1,premium:27.2,distance:1.2,desvioKm:.8},
+      {id:'b', name:'Estación Ahorro',cre:'PL/002',lat:lat+.005,lng:lng+.002,regular:23.45,premium:26.2,distance:3.1,desvioKm:.5},
+      {id:'c', name:'Gasolinera Ruta',cre:'PL/003',lat:lat+.008,lng:lng+.004,regular:24.3,premium:25.3,distance:4.6,desvioKm:1.1},
     ];
     const mejor = [...stations].sort((a,b)=>a[tipo]-b[tipo])[0];
     return {stations,mejor};
@@ -64,7 +64,7 @@ async function fixturePage(browser, settings={}) {
     if (url.pathname==='/api/estaciones') {
       const lat=Number(url.searchParams.get('lat')),lng=Number(url.searchParams.get('lng'));
       const {stations,mejor} = stationsFor(lat,lng,tipo);
-      await sleep(mode.slowDiesel&&tipo==='diesel'?900:250);
+      await sleep(mode.slowPremium&&tipo==='premium'?900:250);
       if (mode.stationsError) return route.fulfill({status:502,json:{error:'No se pudieron leer los datos oficiales de la CNE.'}});
       return route.fulfill({json:{tipo,radioKm:Number(url.searchParams.get('radio')),totalZona:3,promedioZona:25.7,cercanas:stations,baratas:stations,mejor,masCercana:stations[0]}});
     }
@@ -126,6 +126,13 @@ async function swipe(page, locator, dx, dy=0) {
     const desktop=await fixturePage(browser);
     const {page,calls,mode}=desktop;
     currentPage=page;
+    await check('Combustible: solo gasolina Magna y Premium',async()=>{
+      const fuels=page.getByRole('group',{name:'Combustible',exact:true});
+      await expect(fuels.getByRole('button')).toHaveCount(2);
+      await expect(fuels.getByRole('button',{name:'Magna',exact:true})).toHaveAttribute('aria-pressed','true');
+      await expect(fuels.getByRole('button',{name:'Premium',exact:true})).toHaveAttribute('aria-pressed','false');
+      await expect(fuels.getByText('Diésel',{exact:true})).toHaveCount(0);
+    });
     await check('Pestañas: semántica, flechas, Inicio/Fin y foco itinerante',async()=>{
       await expect(page.getByRole('tab')).toHaveCount(5);
       await expect(page.getByRole('tablist')).toHaveCount(1);
@@ -161,6 +168,7 @@ async function swipe(page, locator, dx, dy=0) {
       await expect(input).toHaveAttribute('aria-expanded','false');
       await expect(page.locator('.hero .actions button').nth(1)).toBeDisabled();
       await expect(page.locator('#section-panel-cercanas .swipe-card')).toHaveCount(3);
+      await expect(page.locator('#section-panel-cercanas .price-pill')).toHaveCount(6);
       await expect(page.locator('.hero .actions button').nth(1)).toHaveAttribute('data-state','success');
     });
     await check('Combobox: caché normalizada, Escape, clic fuera, sin resultados y reintento',async()=>{
@@ -206,13 +214,13 @@ async function swipe(page, locator, dx, dy=0) {
       mode.stationsError=false;
       await refresh.click();
       await expect(refresh).toHaveAttribute('data-state','success');
-      mode.slowDiesel=true;
-      await page.getByRole('button',{name:'Diésel',exact:true}).click();
-      await page.getByRole('button',{name:'Regular',exact:true}).click();
+      mode.slowPremium=true;
+      await page.getByRole('button',{name:'Premium',exact:true}).click();
+      await page.getByRole('button',{name:'Magna',exact:true}).click();
       await expect(refresh).toHaveAttribute('data-state','success');
       await sleep(1000);
       await expect(page.locator('#section-panel-cercanas .price-pill.selected').first()).toContainText('$25.10');
-      await expect(page.getByRole('button',{name:'Regular',exact:true})).toHaveAttribute('aria-pressed','true');
+      await expect(page.getByRole('button',{name:'Magna',exact:true})).toHaveAttribute('aria-pressed','true');
     });
     await check('Orden de baratas y acciones de escritorio siempre disponibles',async()=>{
       await page.getByRole('tab',{name:'Más baratas',exact:true}).click();

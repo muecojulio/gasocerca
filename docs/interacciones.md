@@ -40,7 +40,7 @@ npm test
 npm run build
 ```
 
-`npm test`: 16 pruebas sin dependencias adicionales (`node:test`), sobre normalización, filtros, ejes, umbrales/velocidad, límites de acciones, navegación de pestañas, desbordamiento y centrado.
+`npm test`: 18 pruebas sin dependencias adicionales (`node:test`), incluidos los combustibles permitidos (Magna y Premium), además de normalización, filtros, ejes, umbrales/velocidad, límites de acciones, navegación de pestañas, desbordamiento y centrado.
 
 ### Regresiones de navegador (opcionales, herramientas aisladas)
 
@@ -62,7 +62,7 @@ NODE_PATH="$QA_DIR/node_modules" BASE_URL=http://127.0.0.1:3000 npm run test:bro
 
 Si el sistema carece de librerías de Chromium, usar `playwright install-deps chromium` con los permisos adecuados. También se admite `CHROMIUM_EXECUTABLE=/ruta/a/chromium`. `QA_OUTPUT_DIR` permite elegir dónde guardar capturas; por defecto van al directorio temporal del sistema, nunca a Git.
 
-`test:browser`: **24 comprobaciones** en Chromium, incluidas interacciones táctiles reales mediante CDP, teclado, estados de GPS/precios/ruta/instalación/copia, respuestas fuera de orden, reintentos, foco/inert, mapa, carruseles, movimiento reducido, texto al 200 % y anchos de 320/360/390/768/800/1280 px. Axe revisa etiquetas, semántica y contraste de la aplicación con las reglas WCAG A/AA 2.0/2.1 en los estados de lista, ruta, mapa, fallo del mapa, comparación móvil, movimiento reducido, instalación y privacidad.
+`test:browser`: **25 comprobaciones** en Chromium, incluidas las opciones Magna/Premium, interacciones táctiles reales mediante CDP, teclado, estados de GPS/precios/ruta/instalación/copia, respuestas fuera de orden, reintentos, foco/inert, mapa, carruseles, movimiento reducido, texto al 200 % y anchos de 320/360/390/768/800/1280 px. Axe revisa etiquetas, semántica y contraste de la aplicación con las reglas WCAG A/AA 2.0/2.1 en los estados de lista, ruta, mapa, fallo del mapa, comparación móvil, movimiento reducido, instalación y privacidad.
 
 Las APIs, permisos GPS, prompt de instalación, portapapeles, teselas/QR y fuentes se simulan para resultados deterministas; **el código Leaflet 1.9.4 sí es real**. Los mocks solo están en `tests/`, no en el producto. Estas pruebas no sustituyen una revisión con lectores de pantalla y dispositivos físicos.
 

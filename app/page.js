@@ -17,7 +17,7 @@ import useApiRequest from "./components/interactions/useApiRequest";
 
 export default function HomePage() {
   const [tab, setTab] = useState("cercanas");
-  const [tipo, setTipo] = useState("regular");
+  const [tipo, setTipo] = useState(FUELS[0].id);
   const [radio, setRadio] = useState(8);
   const [coords, setCoords] = useState(null);
   const [lugar, setLugar] = useState("");

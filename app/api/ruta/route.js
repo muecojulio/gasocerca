@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { estacionesEnRuta } from "../../../lib/catalogo";
+import { INVALID_FUEL_MESSAGE, parseFuelType } from "../../../lib/fuels.mjs";
 
 export const maxDuration = 15;
 
@@ -18,8 +19,10 @@ export async function GET(request) {
   const fromLng = Number(searchParams.get("fromLng"));
   const toLat = Number(searchParams.get("toLat"));
   const toLng = Number(searchParams.get("toLng"));
-  const tipo = searchParams.get("tipo") || "regular";
+  const tipo = parseFuelType(searchParams.get("tipo"));
   const radioKm = Number(searchParams.get("radio") || 3);
+
+  if (tipo === null) return json({ error: INVALID_FUEL_MESSAGE }, 400);
 
   const nums = [fromLat, fromLng, toLat, toLng];
   if (nums.some((n) => !Number.isFinite(n))) {
