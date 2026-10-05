@@ -21,7 +21,7 @@ export const viewport = {
   themeColor: "#07111f",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }) {
@@ -41,11 +41,11 @@ export default function RootLayout({ children }) {
       </head>
       <body>
         {children}
-        <script
+        {process.env.NODE_ENV === "production" && <script
           dangerouslySetInnerHTML={{
-            __html: `if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js"));}`,
+            __html: `if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}`,
           }}
-        />
+        />}
       </body>
     </html>
   );

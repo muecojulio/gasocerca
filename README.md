@@ -48,6 +48,20 @@ npm install
 npm run dev
 ```
 
+## Interacciones y comprobaciones
+
+Botones con estados, pestañas accesibles, búsqueda de origen/destino con teclado,
+carriles nativos, carruseles responsive y acciones deslizables con alternativa visible.
+Se respeta el movimiento reducido y se permite el zoom.
+
+```
+npm test
+npm run build
+```
+
+Decisiones, componentes, pruebas opcionales de navegador y límites conocidos:
+[`docs/interacciones.md`](docs/interacciones.md).
+
 ## Vercel
 
 Importar el repo privado `gasocerca`. Framework Next.js. Sin env secrets.

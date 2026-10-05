@@ -1,35 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-
-const FUELS = [
-  { id: "regular", label: "Regular" },
-  { id: "premium", label: "Premium" },
-  { id: "diesel", label: "Diésel" },
-];
-const RADIOS = [3, 5, 8, 15, 25];
-
-function money(n) {
-  if (n == null) return "—";
-  return `$${Number(n).toFixed(2)}`;
-}
-function mapsUrl(station) {
-  return `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`;
-}
-function wazeUrl(station) {
-  return `https://waze.com/ul?ll=${station.lat},${station.lng}&navigate=yes`;
-}
-function routeMapsUrl(origin, dest, via) {
-  const params = new URLSearchParams({
-    api: "1",
-    origin: `${origin.lat},${origin.lng}`,
-    destination: `${dest.lat},${dest.lng}`,
-    travelmode: "driving",
-  });
-  if (via) params.set("waypoints", `${via.lat},${via.lng}`);
-  return `https://www.google.com/maps/dir/?${params.toString()}`;
-}
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FUELS, money, RADIOS, routeMapsUrl, searchPlaces, SECTIONS } from "../lib/gasocerca";
+import { normalizeSearch } from "../lib/interactions.mjs";
+import StationCard from "./components/StationCard";
+import StationMap from "./components/StationMap";
+import CardCarousel from "./components/interactions/CardCarousel";
+import Disclosure from "./components/interactions/Disclosure";
+import FeedbackButton, { FeedbackMessage } from "./components/interactions/FeedbackButton";
+import ScrollRail from "./components/interactions/ScrollRail";
+import SearchCombobox from "./components/interactions/SearchCombobox";
+import SectionTabs from "./components/interactions/SectionTabs";
+import TabPanels from "./components/interactions/TabPanels";
+import useApiRequest from "./components/interactions/useApiRequest";
 
 export default function HomePage() {
   const [tab, setTab] = useState("cercanas");
@@ -38,175 +22,94 @@ export default function HomePage() {
   const [coords, setCoords] = useState(null);
   const [lugar, setLugar] = useState("");
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState([]);
   const [destQuery, setDestQuery] = useState("");
-  const [destSuggestions, setDestSuggestions] = useState([]);
   const [destino, setDestino] = useState(null);
-  const [ruta, setRuta] = useState(null);
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [rutaLoading, setRutaLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [gpsStatus, setGpsStatus] = useState("idle");
+  const [gpsError, setGpsError] = useState("");
+  const [formError, setFormError] = useState("");
+  const [announcement, setAnnouncement] = useState("");
+  const gpsOperation = useRef(null);
+  const stations = useApiRequest();
+  const route = useApiRequest();
+  const data = stations.data;
+  const ruta = route.data;
+  const fuelLabel = FUELS.find((fuel) => fuel.id === tipo).label;
+  const stationsUrl = coords ? `/api/estaciones?lat=${coords.lat}&lng=${coords.lng}&radio=${radio}&tipo=${tipo}` : null;
+  const routeUrl = coords && destino ? `/api/ruta?fromLat=${coords.lat}&fromLng=${coords.lng}&toLat=${destino.lat}&toLng=${destino.lng}&tipo=${tipo}&radio=3` : null;
 
-  async function loadStations(nextCoords, nextTipo = tipo, nextRadio = radio) {
-    if (!nextCoords) return;
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/estaciones?lat=${nextCoords.lat}&lng=${nextCoords.lng}&radio=${nextRadio}&tipo=${nextTipo}`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "No se pudieron cargar las estaciones.");
-      setData(json);
-    } catch (err) {
-      setData(null);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const refreshStations = useCallback(async () => {
+    if (!stationsUrl) return;
+    const json = await stations.request(stationsUrl);
+    if (json) setAnnouncement(`${json.totalZona} estaciones encontradas. Precios actualizados.`);
+  }, [stationsUrl, stations.request]);
 
-  async function loadRuta(origin, dest, nextTipo = tipo) {
-    if (!origin || !dest) return;
-    setRutaLoading(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/ruta?fromLat=${origin.lat}&fromLng=${origin.lng}&toLat=${dest.lat}&toLng=${dest.lng}&tipo=${nextTipo}&radio=3`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "No se pudo calcular la ruta.");
-      setRuta(json);
+  const calculateRoute = useCallback(async () => {
+    if (!routeUrl) return;
+    const json = await route.request(routeUrl);
+    if (json) {
       setTab("ruta");
-    } catch (err) {
-      setRuta(null);
-      setError(err.message);
-    } finally {
-      setRutaLoading(false);
+      setAnnouncement(`Ruta calculada: ${json.distanciaKm} kilómetros, ${json.duracionMin} minutos. Tu destino se conserva.`);
     }
-  }
+  }, [routeUrl, route.request]);
+
+  useEffect(() => { refreshStations(); }, [refreshStations]);
+  useEffect(() => { calculateRoute(); }, [calculateRoute]);
+  useEffect(() => () => { gpsOperation.current = null; }, []);
 
   function useGps() {
+    if (gpsOperation.current) return;
+    setGpsError("");
+    setFormError("");
     if (!navigator.geolocation) {
-      setError("Este dispositivo no permite geolocalización. Busca una ciudad.");
+      setGpsStatus("error");
+      setGpsError("Este dispositivo no permite geolocalización. Busca una ciudad.");
       return;
     }
-    setLoading(true);
+    const operation = Symbol("gps");
+    gpsOperation.current = operation;
+    setGpsStatus("loading");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const next = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setCoords(next);
+        if (gpsOperation.current !== operation) return;
+        gpsOperation.current = null;
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLugar("Tu ubicación actual");
-        loadStations(next);
-        if (destino) loadRuta(next, destino);
+        setQuery("");
+        setGpsStatus("success");
+        setAnnouncement("Ubicación encontrada. Cargando precios de tu zona.");
       },
       () => {
-        setLoading(false);
-        setError("No se pudo leer el GPS. Acepta el permiso de ubicación o busca una ciudad.");
+        if (gpsOperation.current !== operation) return;
+        gpsOperation.current = null;
+        setGpsStatus("error");
+        setGpsError("No se pudo leer el GPS. Acepta el permiso de ubicación o busca una ciudad.");
       },
       { enableHighAccuracy: true, timeout: 12000 }
     );
   }
 
-  async function searchCity(text, setter) {
-    if (!text || text.length < 3) {
-      setter([]);
-      return;
-    }
-    const res = await fetch(`/api/buscar?q=${encodeURIComponent(text)}`);
-    const json = await res.json();
-    setter(json.results || []);
-  }
-
   function pickPlace(place) {
-    const next = { lat: place.lat, lng: place.lng };
-    setCoords(next);
+    // Ignore an outstanding GPS callback if a city was chosen in the meantime.
+    gpsOperation.current = null;
+    setGpsStatus("idle");
+    setGpsError("");
+    setFormError("");
+    setCoords({ lat: place.lat, lng: place.lng });
     setLugar(place.label);
     setQuery(place.label.split(",")[0]);
-    setSuggestions([]);
-    loadStations(next);
-    if (destino) loadRuta(next, destino);
   }
 
   function pickDestino(place) {
-    const next = { lat: place.lat, lng: place.lng, label: place.label };
-    setDestino(next);
+    setDestino({ lat: place.lat, lng: place.lng, label: place.label });
     setDestQuery(place.label.split(",")[0]);
-    setDestSuggestions([]);
-    if (coords) loadRuta(coords, next);
-    else setError("Primero elige tu origen (GPS o ciudad). La ruta no se pierde.");
+    setFormError(coords ? "" : "Primero elige tu origen (GPS o ciudad). Tu destino no se pierde.");
   }
 
-  useEffect(() => {
-    if (coords) loadStations(coords, tipo, radio);
-    if (coords && destino) loadRuta(coords, destino, tipo);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipo, radio]);
-
-  useEffect(() => {
-    if (!coords || (tab !== "mapa" && tab !== "ruta")) return;
-    let map;
-    let cancelled = false;
-    async function draw() {
-      if (!window.L) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-          script.onload = resolve;
-          script.onerror = reject;
-          document.body.appendChild(script);
-        });
-      }
-      if (cancelled || !window.L || !coords) return;
-      const el = document.getElementById("map");
-      if (!el) return;
-      if (el._leaflet_id) el._leaflet_id = null;
-      el.innerHTML = "";
-      map = window.L.map(el).setView([coords.lat, coords.lng], 13);
-      window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap" }).addTo(map);
-      setTimeout(() => map.invalidateSize(), 250);
-      window.L.marker([coords.lat, coords.lng]).addTo(map).bindPopup("Origen");
-      if (destino) window.L.marker([destino.lat, destino.lng]).addTo(map).bindPopup(destino.label || "Destino");
-      if (ruta?.geometry?.length) {
-        const latlngs = ruta.geometry.map(([lng, lat]) => [lat, lng]);
-        const line = window.L.polyline(latlngs, { color: "#6cb6ff", weight: 5, opacity: 0.9 }).addTo(map);
-        map.fitBounds(line.getBounds(), { padding: [28, 28] });
-        (ruta.estaciones || []).forEach((station) => {
-          const isBest = ruta.mejor && station.id === ruta.mejor.id;
-          window.L.circleMarker([station.lat, station.lng], {
-            radius: isBest ? 10 : 7,
-            color: isBest ? "#3dd68c" : "#f5b942",
-            fillOpacity: 0.9,
-          }).addTo(map).bindPopup(`<b>${isBest ? "Más barata en ruta · " : ""}${station.name}</b><br/>${money(station[tipo])} / L`);
-        });
-        return;
-      }
-      (data?.cercanas || []).forEach((station) => {
-        window.L.circleMarker([station.lat, station.lng], {
-          radius: 8,
-          color: data.mejor && station.id === data.mejor.id ? "#3dd68c" : "#f5b942",
-          fillOpacity: 0.9,
-        }).addTo(map).bindPopup(`<b>${station.name}</b><br/>${money(station[tipo])} / L`);
-      });
-    }
-    draw();
-    return () => {
-      cancelled = true;
-      if (map) map.remove();
-    };
-  }, [data, tab, coords, tipo, destino, ruta]);
-
-  const list = useMemo(() => {
-    const source = tab === "baratas" ? data?.baratas : data?.cercanas;
-    if (!source) return [];
-    if (tab === "baratas") {
-      return [...source].sort((a, b) => {
-        const pa = a[tipo];
-        const pb = b[tipo];
-        if (pa == null) return 1;
-        if (pb == null) return -1;
-        return pa - pb || a.distance - b.distance;
-      });
-    }
-    return source;
-  }, [tab, data, tipo]);
+  const cheapest = useMemo(() => [...(data?.baratas || [])].sort((a, b) => {
+    if (a[tipo] == null) return b[tipo] == null ? 0 : 1;
+    if (b[tipo] == null) return -1;
+    return a[tipo] - b[tipo] || a.distance - b.distance;
+  }), [data, tipo]);
 
   const ahorro = useMemo(() => {
     if (!data?.mejor || !data?.promedioZona || data.mejor[tipo] == null) return null;
@@ -214,43 +117,79 @@ export default function HomePage() {
     return { porLitro, tanque40: porLitro * 40 };
   }, [data, tipo]);
 
-  function StationCard({ station, extra }) {
+  const gpsBusy = gpsStatus === "loading";
+  const stationsBusy = stations.status === "loading";
+  const routeBusy = route.status === "loading";
+  const busy = gpsBusy || stationsBusy || routeBusy;
+  const errors = [gpsError, formError, stations.error, route.error].filter(Boolean);
+  const statusMessage = gpsBusy ? "Buscando tu ubicación…" : routeBusy ? "Calculando ruta…" : stationsBusy ? "Buscando estaciones…" : errors.length ? "" : announcement;
+  const originSelection = coords && normalizeSearch(query) === normalizeSearch(lugar.split(",")[0]) ? { ...coords, label: lugar } : null;
+  const destinationSelected = destino && normalizeSearch(destQuery) === normalizeSearch(destino.label.split(",")[0]);
+
+  function renderStations(list, inRoute = false) {
     return (
-      <article className="card">
-        <div className="card-top">
-          <h3>{station.name}</h3>
-          <div>
-            {data?.masCercana?.id === station.id && <span className="badge gold">Más cerca</span>}{" "}
-            {data?.mejor?.id === station.id && <span className="badge green">Más barata</span>}
-            {extra}
-          </div>
-        </div>
-        <p className="meta">{station.distance != null ? `${station.distance} km` : `Desvío ${station.desvioKm} km`} · permiso {station.cre || "CNE"}</p>
-        <div className="prices">
-          {FUELS.map((f) => (
-            <div key={f.id} className={`price-pill ${tipo === f.id ? "selected" : ""}`}>
-              <small>{f.label}</small>
-              <b>{money(station[f.id])}</b>
-            </div>
-          ))}
-        </div>
-        <div className="card-actions">
-          <a href={mapsUrl(station)} target="_blank" rel="noreferrer">Cómo llegar</a>
-          <a href={wazeUrl(station)} target="_blank" rel="noreferrer">Waze</a>
-        </div>
-      </article>
+      <div className="station-list" aria-busy={(inRoute ? routeBusy : stationsBusy) || undefined}>
+        {list.map((station) => (
+          <StationCard
+            key={station.id} station={station} tipo={tipo} inRoute={inRoute}
+            best={station.id === (inRoute ? ruta?.mejor?.id : data?.mejor?.id)}
+            closest={!inRoute && station.id === data?.masCercana?.id}
+          />
+        ))}
+        {data && !list.length && !busy && !inRoute && <div className="empty">No se encontraron estaciones {tab === "baratas" ? `con precio de ${fuelLabel}` : ""} en este radio. Prueba ampliarlo.</div>}
+      </div>
     );
   }
 
+  const panels = {
+    cercanas: <><h2 className="section-heading">Gasolineras más cercanas</h2>{renderStations(data?.cercanas || [])}</>,
+    baratas: <><h2 className="section-heading">Gasolineras más baratas</h2><p className="notice">Orden: {fuelLabel}, de la más barata a la más cara.</p>{renderStations(cheapest)}</>,
+    ruta: <>
+      <h2 className="section-heading">En tu ruta</h2>
+      {!destino && <div className="empty">Escribe un destino. Se conserva la ruta y se marca la más barata.</div>}
+      {destino && <p className="notice">Destino de la ruta: {destino.label}</p>}
+      {destino && !coords && <div className="empty">Elige tu origen para calcular la ruta hacia tu destino.</div>}
+      {ruta && coords && destino && (
+        <CardCarousel label="Resumen de tu ruta">
+          <div className="compare-box">
+            <h3>Ruta conservada</h3>
+            <p>{ruta.distanciaKm} km · {ruta.duracionMin} min</p>
+            <div className="card-actions">
+              <a href={routeMapsUrl(coords, destino, ruta.mejor)} target="_blank" rel="noopener noreferrer" aria-label="Ruta con parada barata en Google Maps (abre en otra pestaña)">Ruta + parada barata <span aria-hidden="true">↗</span></a>
+              <a href={routeMapsUrl(coords, destino)} target="_blank" rel="noopener noreferrer" aria-label="Ruta solo al destino en Google Maps (abre en otra pestaña)">Solo destino <span aria-hidden="true">↗</span></a>
+            </div>
+          </div>
+          <div className="compare-box">
+            <h3>Más barata en el camino ({fuelLabel})</h3>
+            {ruta.mejor ? <><p>{ruta.mejor.name}</p><div className="save">{money(ruta.mejor[tipo])} / L</div></> : <p>Sin precios de {fuelLabel} en la ruta.</p>}
+          </div>
+        </CardCarousel>
+      )}
+      {renderStations(ruta?.estaciones || [], true)}
+    </>,
+    mapa: <><h2 className="section-heading">Mapa de estaciones</h2><StationMap active={tab === "mapa"} coords={coords} data={data} tipo={tipo} destino={destino} ruta={ruta} /></>,
+    comparar: <>
+      <h2 className="section-heading">Compara y ahorra</h2>
+      <CardCarousel label="Comparación de precios">
+        <div className="compare-box">
+          <h3>Mejor precio de {fuelLabel}</h3>
+          {data?.mejor ? <><p>{data.mejor.name}</p><div className="save">{money(data.mejor[tipo])} / L</div></> : <p>Aún no hay comparación.</p>}
+        </div>
+        <div className="compare-box">
+          <h3>Tanque de 40 L</h3>
+          {ahorro && ahorro.porLitro > 0 ? <div className="save">Ahorras {money(ahorro.tanque40)}</div> : <p>Sin ahorro calculado.</p>}
+        </div>
+      </CardCarousel>
+    </>,
+  };
+
   return (
     <main className="app-shell">
+      <a className="skip-link" href={`#section-panel-${tab}`}>Saltar a los resultados</a>
       <header className="topbar">
         <div className="brand">
-          <img src="/icon-192.png" alt="GasoCerca" />
-          <div>
-            <h1>GasoCerca</h1>
-            <p>Precios oficiales en México</p>
-          </div>
+          <img src="/icon-192.png" alt="" width="42" height="42" />
+          <div><h1>GasoCerca</h1><p>Precios oficiales en México</p></div>
         </div>
         <div className="top-links">
           <Link className="ghost" href="/privacidad">Privacidad</Link>
@@ -258,125 +197,57 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="hero">
-        <h2>Encuentra la gasolina más cercana y la más barata</h2>
-        <p>Elige Regular o Premium para ordenar de la más barata a la más cara. El destino conserva la ruta y marca la gasolinera más barata del camino.</p>
+      <section className="hero" aria-labelledby="search-title">
+        <h2 id="search-title">Encuentra la gasolina más cercana y la más barata</h2>
+        <p>Elige tu combustible para ordenar de la más barata a la más cara. El destino conserva la ruta y marca la gasolinera más barata del camino.</p>
         <div className="actions">
-          <button className="primary" onClick={useGps} disabled={loading}>Usar mi ubicación</button>
-          <button className="ghost" onClick={() => coords && loadStations(coords)} disabled={loading || !coords}>Actualizar precios</button>
+          <FeedbackButton className="primary" status={gpsStatus} onClick={useGps} disabled={stationsBusy} loadingLabel="Obteniendo ubicación…" successLabel="Ubicación lista" errorLabel="Reintentar ubicación">Usar mi ubicación</FeedbackButton>
+          <FeedbackButton status={stations.status} onClick={refreshStations} disabled={gpsBusy || !coords} loadingLabel="Actualizando precios…" successLabel="Precios actualizados" errorLabel="Reintentar precios">Actualizar precios</FeedbackButton>
         </div>
-        <div className="search-row">
-          <input value={query} placeholder="Origen: ciudad, colonia o municipio" onChange={(e) => {
-            const value = e.target.value;
-            setQuery(value);
-            clearTimeout(window.__gasoBuscar);
-            window.__gasoBuscar = setTimeout(() => searchCity(value, setSuggestions), 450);
-          }} />
-        </div>
-        {suggestions.length > 0 && (
-          <div className="suggestions">
-            {suggestions.map((item) => (
-              <button key={item.label} className="suggestion" onClick={() => pickPlace(item)}>{item.label}</button>
+        <SearchCombobox id="origen" label="Origen" value={query} onChange={setQuery} onSelect={pickPlace} selectedOption={originSelection} loadOptions={searchPlaces} placeholder="Ciudad, colonia o municipio" />
+
+        <Disclosure title="Destino y ruta" className="dest-box">
+          <div className="destination-fields">
+            <SearchCombobox id="destino" label="Destino" value={destQuery} onChange={setDestQuery} onSelect={pickDestino} selectedOption={destinationSelected ? destino : null} loadOptions={searchPlaces} placeholder="¿A dónde vas?" />
+            <FeedbackButton className="primary route-button" status={route.status} disabled={!coords || !destinationSelected || gpsBusy} onClick={calculateRoute} loadingLabel="Calculando ruta…" successLabel="Ruta lista" errorLabel="Reintentar ruta">Ruta + más barata</FeedbackButton>
+          </div>
+          {destino && <p className="field-help saved-destination">Destino guardado: {destino.label}</p>}
+        </Disclosure>
+
+        <div className="filters" role="group" aria-label="Filtros">
+          <ScrollRail label="Combustible" selectedKey={tipo} hint>
+            {FUELS.map((fuel) => (
+              <button type="button" key={fuel.id} data-rail-key={fuel.id} className={`chip ${tipo === fuel.id ? "active" : ""}`} aria-pressed={tipo === fuel.id} onClick={() => setTipo(fuel.id)}>
+                <span className="selection-mark" aria-hidden="true">{tipo === fuel.id ? "✓" : ""}</span>{fuel.label}
+              </button>
             ))}
-          </div>
-        )}
-        <div className="dest-box">
-          <label htmlFor="destino">Destino</label>
-          <div className="search-row">
-            <input id="destino" value={destQuery} placeholder="¿A dónde vas?" onChange={(e) => {
-              const value = e.target.value;
-              setDestQuery(value);
-              clearTimeout(window.__gasoDest);
-              window.__gasoDest = setTimeout(() => searchCity(value, setDestSuggestions), 450);
-            }} />
-            <button className="primary" disabled={rutaLoading || !coords || !destino} onClick={() => coords && destino && loadRuta(coords, destino)}>Ruta + más barata</button>
-          </div>
-          {destSuggestions.length > 0 && (
-            <div className="suggestions">
-              {destSuggestions.map((item) => (
-                <button key={item.label} className="suggestion" onClick={() => pickDestino(item)}>{item.label}</button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="filters">
-          {FUELS.map((fuel) => (
-            <button key={fuel.id} className={`chip switch-chip ${tipo === fuel.id ? "active" : ""}`} aria-pressed={tipo === fuel.id} onClick={() => setTipo(fuel.id)}>{fuel.label}</button>
-          ))}
-          {RADIOS.map((km) => (
-            <button key={km} className={`chip ${radio === km ? "active" : ""}`} aria-pressed={radio === km} onClick={() => setRadio(km)}>{km} km</button>
-          ))}
+          </ScrollRail>
+          <ScrollRail label="Radio de búsqueda" selectedKey={radio} hint>
+            {RADIOS.map((km) => (
+              <button type="button" key={km} data-rail-key={km} className={`chip ${radio === km ? "active" : ""}`} aria-pressed={radio === km} onClick={() => setRadio(km)}>
+                <span className="selection-mark" aria-hidden="true">{radio === km ? "✓" : ""}</span>{km} km
+              </button>
+            ))}
+          </ScrollRail>
         </div>
       </section>
 
       {lugar && (
-        <div className="stats">
+        <div className="stats" role="group" aria-label="Resumen de la zona">
           <div className="stat"><span>Zona</span><strong>{lugar.split(",")[0]}</strong></div>
-          <div className="stat"><span>Promedio {tipo}</span><strong>{money(data?.promedioZona)}</strong></div>
+          <div className="stat"><span>Promedio {fuelLabel}</span><strong>{money(data?.promedioZona)}</strong></div>
           <div className="stat"><span>Estaciones</span><strong>{data?.totalZona ?? "—"}</strong></div>
         </div>
       )}
 
-      <div className="tabs">
-        {[["cercanas", "Más cercanas"], ["baratas", "Más baratas"], ["ruta", "En ruta"], ["mapa", "Mapa"], ["comparar", "Comparar"]].map(([id, label]) => (
-          <button key={id} className={`chip ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>{label}</button>
-        ))}
+      <SectionTabs items={SECTIONS} value={tab} onChange={setTab} />
+      <div className={statusMessage ? `${busy ? "loading" : "notice"} feedback-message` : "sr-only"} role="status" aria-live="polite" aria-atomic="true">
+        {statusMessage && <span className={`feedback-icon ${busy ? "spinner" : ""}`} aria-hidden="true">{busy ? "" : "✓"}</span>}
+        <span>{statusMessage}</span>
       </div>
-
-      {(loading || rutaLoading) && <div className="loading">{rutaLoading ? "Calculando ruta…" : "Buscando estaciones…"}</div>}
-      {error && <div className="error">{error}</div>}
-      {!loading && !error && !data && <div className="empty">Toca “Usar mi ubicación” o busca una ciudad.</div>}
-
-      <section className={`panel ${tab === "cercanas" || tab === "baratas" ? "active" : ""}`}>
-        {tab === "baratas" && <p className="notice">Orden: {tipo} de la más barata a la más cara.</p>}
-        {(list || []).map((station) => <StationCard key={`${tab}-${station.id}`} station={station} />)}
-      </section>
-
-      <section className={`panel ${tab === "ruta" ? "active" : ""}`}>
-        {!destino && <div className="empty">Escribe un destino. Se conserva la ruta y se marca la más barata.</div>}
-        {ruta && coords && destino && (
-          <div className="compare-grid">
-            <div className="compare-box">
-              <h3>Ruta conservada</h3>
-              <p>{ruta.distanciaKm} km · {ruta.duracionMin} min</p>
-              <div className="card-actions">
-                <a href={routeMapsUrl(coords, destino, ruta.mejor)} target="_blank" rel="noreferrer">Ruta + parada barata</a>
-                <a href={routeMapsUrl(coords, destino)} target="_blank" rel="noreferrer">Solo destino</a>
-              </div>
-            </div>
-            <div className="compare-box">
-              <h3>Más barata en el camino ({tipo})</h3>
-              {ruta.mejor ? <><p>{ruta.mejor.name}</p><div className="save">{money(ruta.mejor[tipo])} / L</div></> : <p>Sin precios de {tipo} en la ruta.</p>}
-            </div>
-          </div>
-        )}
-        {(ruta?.estaciones || []).map((station) => (
-          <StationCard key={`ruta-${station.id}`} station={station} extra={ruta?.mejor?.id === station.id ? <span className="badge green">En ruta</span> : null} />
-        ))}
-      </section>
-
-      <section className={`panel ${tab === "mapa" ? "active" : ""}`}>
-        <div id="map" />
-      </section>
-
-      <section className={`panel ${tab === "comparar" ? "active" : ""}`}>
-        <div className="compare-grid">
-          <div className="compare-box">
-            <h3>Mejor precio de {tipo}</h3>
-            {data?.mejor ? <><p>{data.mejor.name}</p><div className="save">{money(data.mejor[tipo])} / L</div></> : <p>Aún no hay comparación.</p>}
-          </div>
-          <div className="compare-box">
-            <h3>Tanque 40 L</h3>
-            {ahorro && ahorro.porLitro > 0 ? <div className="save">Ahorras {money(ahorro.tanque40)}</div> : <p>Sin ahorro calculado.</p>}
-          </div>
-        </div>
-      </section>
-
-      <nav className="bottom-nav">
-        {[["cercanas", "Cercanas"], ["baratas", "Baratas"], ["ruta", "Ruta"], ["mapa", "Mapa"], ["comparar", "Comparar"]].map(([id, label]) => (
-          <button key={id} className={`tab ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>{label}</button>
-        ))}
-      </nav>
+      {errors.length > 0 && <FeedbackMessage tone="error">{errors.join(" ")}</FeedbackMessage>}
+      {!busy && !errors.length && !data && <div className="empty">Toca “Usar mi ubicación” o busca una ciudad y elígela de la lista.</div>}
+      <TabPanels items={SECTIONS} value={tab} onChange={setTab} panels={panels} />
     </main>
   );
 }

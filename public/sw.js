@@ -1,4 +1,4 @@
-const CACHE = "gasocerca-v3";
+const CACHE = "gasocerca-v4";
 const PRECACHE = ["/", "/instalar", "/privacidad", "/manifest.json", "/icon-192.svg", "/icon-512.svg", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
