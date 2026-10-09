@@ -83,7 +83,7 @@ export default function SearchCombobox({
         setStatus("error");
         setError(err.message || "No se pudo buscar. Revisa tu conexión e intenta de nuevo.");
       }
-    }, 350);
+    }, 600);
     return () => {
       clearTimeout(timer);
       controller.abort();
@@ -151,7 +151,7 @@ export default function SearchCombobox({
       <div className="combobox-field">
         <input
           ref={input} id={id} type="text" role="combobox" value={value}
-          autoComplete="off" autoCapitalize="none" spellCheck={false}
+          autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={120}
           placeholder={placeholder} aria-autocomplete="list" aria-haspopup="listbox"
           aria-expanded={open} aria-controls={listId}
           aria-activedescendant={open && active >= 0 && items[active] ? `${id}-option-${active}` : undefined}

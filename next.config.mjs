@@ -21,10 +21,11 @@ const nextConfig = {
           ...(!development ? [{ key: "X-Frame-Options", value: "DENY" }] : []),
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "geolocation=(self), microphone=(), camera=(), payment=()" },
+          ...(!development ? [{ key: "Strict-Transport-Security", value: "max-age=63072000" }] : []),
           {
             key: "Content-Security-Policy",
             value:
-              `default-src 'self'; script-src 'self' 'unsafe-inline' ${development ? "'unsafe-eval' " : ""}https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://unpkg.com https://api.qrserver.com; connect-src 'self' ${development ? "https://*.e2b.app wss://*.e2b.app " : ""}https://publicacionexterna.azurewebsites.net https://nominatim.openstreetmap.org https://router.project-osrm.org https://*.tile.openstreetmap.org; worker-src 'self'; frame-ancestors ${development ? "'self' https://arena.ai https://*.arena.ai https://*.e2b.app" : "'none'"};`,
+              `default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' ${development ? "'unsafe-eval' " : ""}; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https://*.tile.openstreetmap.org; connect-src 'self' ${development ? "https://*.e2b.app wss://*.e2b.app " : ""}; worker-src 'self'; frame-ancestors ${development ? "'self' https://arena.ai https://*.arena.ai https://*.e2b.app" : "'none'"};`,
           },
         ],
       },

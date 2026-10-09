@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 import Disclosure from "../components/interactions/Disclosure";
 import FeedbackButton, { FeedbackMessage } from "../components/interactions/FeedbackButton";
 
 export default function InstalarPage() {
   const [url, setUrl] = useState("");
+  const [qr, setQr] = useState("");
+  const [qrError, setQrError] = useState(false);
   const [deferred, setDeferred] = useState(null);
   const [installStatus, setInstallStatus] = useState("idle");
   const [copyStatus, setCopyStatus] = useState("idle");
@@ -35,6 +38,24 @@ export default function InstalarPage() {
       window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
+
+  useEffect(() => {
+    if (!url) return;
+    let active = true;
+    setQr("");
+    setQrError(false);
+    QRCode.toDataURL(url, {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width: 240,
+      color: { dark: "#153846", light: "#ffffff" },
+    }).then((dataUrl) => {
+      if (active) setQr(dataUrl);
+    }).catch(() => {
+      if (active) setQrError(true);
+    });
+    return () => { active = false; };
+  }, [url]);
 
   async function install() {
     if (installing.current) return;
@@ -80,8 +101,6 @@ export default function InstalarPage() {
     }
   }
 
-  const qr = url ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(url)}` : "";
-
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -94,7 +113,7 @@ export default function InstalarPage() {
       <section className="install-card" aria-labelledby="install-title">
         <h2 id="install-title">Escanea el código QR</h2>
         <p className="notice">Abre la cámara del celular y entra a la app. Luego instálala en tu pantalla de inicio.</p>
-        {qr && <img className="qr" src={qr} alt="Código QR de GasoCerca" width="240" height="240" />}
+        {qr ? <img className="qr" src={qr} alt="Código QR de GasoCerca" width="240" height="240" /> : <p className="qr-placeholder" role={qrError ? "alert" : "status"}>{qrError ? "No se pudo generar el código QR en este dispositivo." : "Preparando tu código QR…"}</p>}
         <p className="app-url">{url || "Cargando dirección…"}</p>
         <div className="actions install-actions">
           <FeedbackButton className="primary" status={installStatus} onClick={install} loadingLabel="Abriendo instalación…" successLabel="Instalación aceptada" errorLabel="Reintentar instalación">Instalar en este dispositivo</FeedbackButton>

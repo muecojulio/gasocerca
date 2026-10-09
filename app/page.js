@@ -34,6 +34,9 @@ export default function HomePage() {
   const data = stations.data;
   const ruta = route.data;
   const fuelLabel = FUELS.find((fuel) => fuel.id === tipo).label;
+  const dataUpdatedLabel = data?.updatedAt
+    ? new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(data.updatedAt))
+    : "";
   const stationsUrl = coords ? `/api/estaciones?lat=${coords.lat}&lng=${coords.lng}&radio=${radio}&tipo=${tipo}` : null;
   const routeUrl = coords && destino ? `/api/ruta?fromLat=${coords.lat}&fromLng=${coords.lng}&toLat=${destino.lat}&toLng=${destino.lng}&tipo=${tipo}&radio=3` : null;
 
@@ -198,18 +201,33 @@ export default function HomePage() {
       </header>
 
       <section className="hero" aria-labelledby="search-title">
-        <h2 id="search-title">Encuentra la gasolina más cercana y la más barata</h2>
-        <p>Elige tu combustible para ordenar de la más barata a la más cara. El destino conserva la ruta y marca la gasolinera más barata del camino.</p>
+        <div className="hero-intro">
+          <div className="hero-copy">
+            <p className="hero-kicker"><span aria-hidden="true">✦</span> EXPLORA · COMPARA · AHORRA</p>
+            <h2 id="search-title">La ruta es tuya.<br /><span className="hero-emphasis">El ahorro, también.</span></h2>
+            <p>Encuentra gasolina cerca de ti, compara precios reportados a la CNE y encuentra una parada económica sin perder tu destino.</p>
+            <div className="hero-proof"><span className="proof-dot" aria-hidden="true" /> Datos públicos de México <span className="proof-separator" aria-hidden="true">·</span> Sin cuenta, sin vueltas</div>
+          </div>
+          <div className="hero-art" aria-hidden="true">
+            <span className="hero-sun">G$</span>
+            <svg className="hero-route-art" viewBox="0 0 260 210" fill="none" focusable="false">
+              <path d="M18 112 C58 48 89 176 134 123 S194 43 245 74" />
+            </svg>
+            <div className="hero-pump"><span className="pump-glass">G</span><span className="pump-hose" /></div>
+            <div className="hero-sticker"><strong>¡VÁMONOS!</strong><span>Tu próxima parada</span></div>
+            <span className="hero-spark hero-spark-a">✷</span>
+          </div>
+        </div>
         <div className="actions">
-          <FeedbackButton className="primary" status={gpsStatus} onClick={useGps} disabled={stationsBusy} loadingLabel="Obteniendo ubicación…" successLabel="Ubicación lista" errorLabel="Reintentar ubicación">Usar mi ubicación</FeedbackButton>
-          <FeedbackButton status={stations.status} onClick={refreshStations} disabled={gpsBusy || !coords} loadingLabel="Actualizando precios…" successLabel="Precios actualizados" errorLabel="Reintentar precios">Actualizar precios</FeedbackButton>
+          <FeedbackButton className="primary" status={gpsStatus} onClick={useGps} disabled={stationsBusy} loadingLabel="Obteniendo ubicación…" successLabel="Ubicación lista" errorLabel="Reintentar ubicación"><><span className="action-glyph" aria-hidden="true">⌖</span>Usar mi ubicación</></FeedbackButton>
+          <FeedbackButton status={stations.status} onClick={refreshStations} disabled={gpsBusy || !coords} loadingLabel="Actualizando precios…" successLabel="Precios actualizados" errorLabel="Reintentar precios"><><span className="action-glyph" aria-hidden="true">↻</span>Actualizar precios</></FeedbackButton>
         </div>
         <SearchCombobox id="origen" label="Origen" value={query} onChange={setQuery} onSelect={pickPlace} selectedOption={originSelection} loadOptions={searchPlaces} placeholder="Ciudad, colonia o municipio" />
 
         <Disclosure title="Destino y ruta" className="dest-box">
           <div className="destination-fields">
             <SearchCombobox id="destino" label="Destino" value={destQuery} onChange={setDestQuery} onSelect={pickDestino} selectedOption={destinationSelected ? destino : null} loadOptions={searchPlaces} placeholder="¿A dónde vas?" />
-            <FeedbackButton className="primary route-button" status={route.status} disabled={!coords || !destinationSelected || gpsBusy} onClick={calculateRoute} loadingLabel="Calculando ruta…" successLabel="Ruta lista" errorLabel="Reintentar ruta">Ruta + más barata</FeedbackButton>
+            <FeedbackButton className="primary route-button" status={route.status} disabled={!coords || !destinationSelected || gpsBusy} onClick={calculateRoute} loadingLabel="Calculando ruta…" successLabel="Ruta lista" errorLabel="Reintentar ruta"><><span className="action-glyph" aria-hidden="true">➜</span>Ruta + más barata</></FeedbackButton>
           </div>
           {destino && <p className="field-help saved-destination">Destino guardado: {destino.label}</p>}
         </Disclosure>
@@ -234,11 +252,12 @@ export default function HomePage() {
 
       {lugar && (
         <div className="stats" role="group" aria-label="Resumen de la zona">
-          <div className="stat"><span>Zona</span><strong>{lugar.split(",")[0]}</strong></div>
-          <div className="stat"><span>Promedio {fuelLabel}</span><strong>{money(data?.promedioZona)}</strong></div>
-          <div className="stat"><span>Estaciones</span><strong>{data?.totalZona ?? "—"}</strong></div>
+          <div className="stat"><span><span aria-hidden="true">⌖</span> Zona</span><strong>{lugar.split(",")[0]}</strong></div>
+          <div className="stat"><span><span aria-hidden="true">＄</span> Promedio {fuelLabel}</span><strong>{money(data?.promedioZona)}</strong></div>
+          <div className="stat"><span><span aria-hidden="true">✦</span> Estaciones</span><strong>{data?.totalZona ?? "—"}</strong></div>
         </div>
       )}
+      {dataUpdatedLabel && <p className="data-stamp"><span aria-hidden="true" />Consulta del catálogo CNE: <time dateTime={data.updatedAt}>{dataUpdatedLabel}</time></p>}
 
       <SectionTabs items={SECTIONS} value={tab} onChange={setTab} />
       <div className={statusMessage ? `${busy ? "loading" : "notice"} feedback-message` : "sr-only"} role="status" aria-live="polite" aria-atomic="true">
@@ -248,6 +267,13 @@ export default function HomePage() {
       {errors.length > 0 && <FeedbackMessage tone="error">{errors.join(" ")}</FeedbackMessage>}
       {!busy && !errors.length && !data && <div className="empty">Toca “Usar mi ubicación” o busca una ciudad y elígela de la lista.</div>}
       <TabPanels items={SECTIONS} value={tab} onChange={setTab} panels={panels} />
+      <footer className="site-footer">
+        <span><strong>GasoCerca</strong> · Precios para salir con confianza.</span>
+        <nav className="site-footer-links" aria-label="Información de GasoCerca">
+          <Link href="/privacidad">Privacidad</Link>
+          <Link href="/instalar">Instalar la app</Link>
+        </nav>
+      </footer>
     </main>
   );
 }

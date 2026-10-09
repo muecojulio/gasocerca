@@ -1,7 +1,7 @@
 {
   "name": "gasocerca",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "engines": {
     "node": "24.x"
   },
@@ -13,8 +13,13 @@
     "test:browser": "node tests/browser-checks.cjs"
   },
   "dependencies": {
-    "next": "^15.5.0",
+    "leaflet": "1.9.4",
+    "next": "15.5.27",
+    "qrcode": "1.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
+  },
+  "overrides": {
+    "postcss": "8.5.29"
   }
 }

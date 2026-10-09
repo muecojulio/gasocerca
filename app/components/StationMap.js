@@ -9,17 +9,16 @@ let leafletPromise;
 function loadLeaflet() {
   if (window.L) return Promise.resolve(window.L);
   if (!leafletPromise) {
-    leafletPromise = new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => resolve(window.L);
-      script.onerror = () => {
+    leafletPromise = import("leaflet")
+      .then((module) => {
+        const L = module.default || module;
+        window.L = L;
+        return L;
+      })
+      .catch(() => {
         leafletPromise = null;
-        script.remove();
-        reject(new Error("No se pudo cargar el mapa. Las listas de estaciones siguen disponibles."));
-      };
-      document.body.appendChild(script);
-    });
+        throw new Error("No se pudo cargar el mapa. Las listas de estaciones siguen disponibles.");
+      });
   }
   return leafletPromise;
 }
