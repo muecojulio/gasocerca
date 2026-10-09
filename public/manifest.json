@@ -4,8 +4,8 @@
   "description": "Gasolineras cercanas y precios por litro en México",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#07111f",
-  "theme_color": "#07111f",
+  "background_color": "#f3f1e7",
+  "theme_color": "#153846",
   "lang": "es-MX",
   "icons": [
     {

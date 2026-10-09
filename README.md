@@ -1,67 +1,58 @@
 # GasoCerca
 
-App para encontrar gasolineras en México y comparar gasolina Magna (tipo CNE `regular`) y Premium con datos de la CNE. Diésel no está disponible.
+Aplicación para encontrar gasolineras en México y comparar gasolina Magna (tipo CNE `regular`) y Premium. Diésel no está disponible. La interfaz combina un mapa de estaciones, precios reportados a la CNE y herramientas de ruta.
 
-## Qué hace
+## Funciones
 
-- Origen por GPS o ciudad.
-- Lista cercanas y baratas (el combustible elegido se ordena de más barato a más caro).
-- Destino: calcula la ruta (OSRM) y marca la gasolinera más barata en el camino sin sustituir el destino.
-- Mapa Leaflet + OpenStreetMap.
-- PWA (instalar / QR).
+- Origen por GPS (solo tras solicitar permiso) o búsqueda de ciudad.
+- Estaciones cercanas y lista ordenada por precio.
+- Destino con ruta por carretera; se conserva el destino y se destaca la estación más barata del camino.
+- Mapa Leaflet con teselas de OpenStreetMap.
+- Comparación de precios y estimación de ahorro para un tanque de 40 L.
+- PWA instalable; el QR de instalación se genera localmente en el dispositivo.
 - Política de privacidad en `/privacidad`.
-- Sin funciones de voz.
 
-## Datos e índice
+## Datos e integraciones
 
-No hay base SQL. El catálogo CNE vive en memoria del servidor.
+No hay base SQL ni cuentas.
 
-- Caché de catálogo: 30 minutos (`lib/catalogo.js`).
-- Índice espacial: grid de celdas ~0.05° para no recorrer todo el país en cada búsqueda.
-- HTTP cache en `/api/estaciones` y `/api/ruta`.
-- Service worker cachea UI, no `/api`.
+- Catálogo público CNE: caché temporal de servidor de 30 minutos e índice espacial de celdas; contiene datos públicos, no coordenadas de búsqueda.
+- Nominatim/OpenStreetMap: búsqueda de lugares (máximo 120 caracteres y solicitudes espaciadas por instancia del servidor).
+- OSRM público: cálculo de rutas, sin almacenar las solicitudes con coordenadas en la caché de Next.
+- Teselas OpenStreetMap: se solicitan desde el navegador cuando el mapa está visible.
+- Google Maps y Waze: solo se abren si la persona elige una acción de indicaciones.
+- Leaflet 1.9.4: dependencia fijada y empaquetada localmente; no se carga JavaScript de un CDN.
 
-## APIs públicas (sin key)
-
-- CNE places/prices: `https://publicacionexterna.azurewebsites.net/publicaciones/`
-- Nominatim: búsqueda de lugares
-- OSRM: `https://router.project-osrm.org` (ruta)
-- OSM tiles + Leaflet 1.9.4 (unpkg, repo perliedman/leaflet-routing-machine como referencia de enrutado)
-- QR: api.qrserver.com
-
-No se quitaron integraciones con key porque este proyecto no tenía keys.
-
-## Runtime
-
-Node.js `24.x` (`engines` en `package.json`). Next.js 15.
+No hay tipografías remotas, generador de QR externo, analítica, anuncios ni rastreadores. La Política de privacidad explica los datos que sí reciben los proveedores externos. El responsable legal y su canal de contacto deben completarse en esa página por quien opere el despliegue.
 
 ## Seguridad
 
-Headers: nosniff, DENY frames, referrer strict, permissions-policy sin micrófono/cámara, CSP.
+- Los endpoints que transportan coordenadas o búsquedas responden `Cache-Control: private, no-store`; el service worker excluye `/api` y solo guarda páginas estáticas/archivos de la propia app.
+- Las coordenadas se validan contra el área cubierta en México. La geocodificación limita tamaño de entrada, valida la respuesta externa, espacia solicitudes y tiene timeout; el cálculo de rutas limita a tres operaciones simultáneas por instancia.
+- CSP sin dependencias de script/style externas; además de `nosniff`, política de permisos, control de referrer y protección contra framing. Producción añade HSTS.
+- Dependencias revisadas con `npm audit`: **0 vulnerabilidades conocidas** al actualizar. Next.js se mantiene en la rama 15.5 y PostCSS se fija en 8.5.29, corregido mediante `overrides`; repetir la auditoría con cada actualización.
 
-Ubicación solo con permiso del navegador. No hay cuentas.
+Esto es una revisión automatizada del repositorio, no una certificación ni una auditoría de infraestructura del proveedor de hosting.
 
-## Local
+## Runtime y desarrollo
 
-```
-npm install
-npm run dev
-```
+Node.js `24.x` (Next.js 15). Instala dependencias reproducibles y ejecuta las pruebas:
 
-## Interacciones y comprobaciones
-
-Botones con estados, pestañas accesibles, búsqueda de origen/destino con teclado,
-carriles nativos, carruseles responsive y acciones deslizables con alternativa visible.
-Se respeta el movimiento reducido y se permite el zoom.
-
-```
+```sh
+npm ci
 npm test
 npm run build
 ```
 
-Decisiones, componentes, pruebas opcionales de navegador y límites conocidos:
+Para desarrollo:
+
+```sh
+npm run dev
+```
+
+Decisiones de accesibilidad, gestos, pruebas opcionales de navegador y límites conocidos:
 [`docs/interacciones.md`](docs/interacciones.md).
 
-## Vercel
+## PWA y caché
 
-Importar el repo privado `gasocerca`. Framework Next.js. Sin env secrets.
+El service worker se registra solo en producción. Cachea páginas de la app y archivos estáticos propios; no intercepta solicitudes API, ni conserva geolocalización, búsquedas o rutas. El catálogo CNE se guarda temporalmente en el servidor porque es información pública y compartida.

@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { estacionesEnRuta } from "../../../lib/catalogo";
 import { INVALID_FUEL_MESSAGE, parseFuelType } from "../../../lib/fuels.mjs";
+import { isMexicoCoordinate } from "../../../lib/geo.mjs";
 
 export const maxDuration = 15;
 
-function json(data, status = 200) {
+const MAX_CONCURRENT_ROUTES = 3;
+let activeRoutes = 0;
+
+function json(data, status = 200, extraHeaders = {}) {
   return NextResponse.json(data, {
     status,
-    headers: {
-      "Cache-Control": "public, s-maxage=180, stale-while-revalidate=300",
-    },
+    headers: { "Cache-Control": "private, no-store", ...extraHeaders },
   });
 }
 
@@ -29,15 +31,33 @@ export async function GET(request) {
     return json({ error: "Falta origen o destino." }, 400);
   }
 
-  const inMx = (lat, lng) => lat >= 14 && lat <= 33 && lng >= -118.5 && lng <= -86;
-  if (!inMx(fromLat, fromLng) || !inMx(toLat, toLng)) {
+  if (!isMexicoCoordinate(fromLat, fromLng) || !isMexicoCoordinate(toLat, toLng)) {
     return json({ error: "La ruta debe estar dentro de México." }, 400);
   }
 
+  if (activeRoutes >= MAX_CONCURRENT_ROUTES) {
+    return json(
+      { error: "Hay muchas rutas en cálculo. Espera un momento e inténtalo de nuevo." },
+      429,
+      { "Retry-After": "2" },
+    );
+  }
+
+  activeRoutes += 1;
   try {
-    const data = await estacionesEnRuta({ fromLat, fromLng, toLat, toLng, tipo, radioKm });
+    const data = await estacionesEnRuta({
+      fromLat,
+      fromLng,
+      toLat,
+      toLng,
+      tipo,
+      radioKm,
+      signal: request.signal,
+    });
     return json(data);
-  } catch (error) {
-    return json({ error: error.message || "No se pudo armar la ruta." }, 502);
+  } catch {
+    return json({ error: "No se pudo armar la ruta." }, 502);
+  } finally {
+    activeRoutes -= 1;
   }
 }

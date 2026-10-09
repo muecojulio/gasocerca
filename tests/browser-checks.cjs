@@ -10,7 +10,6 @@ const { expect: baseExpect } = require('playwright/test');
 const expect = baseExpect.configure({timeout:6000});
 const AxeBuilder = require('@axe-core/playwright').default;
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:3000';
-const LEAFLET_DIST = path.dirname(require.resolve('leaflet/dist/leaflet.js'));
 const OUTPUT = process.env.QA_OUTPUT_DIR || path.join(os.tmpdir(), 'gasocerca-qa');
 fs.mkdirSync(OUTPUT, {recursive:true});
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -31,16 +30,7 @@ async function fixturePage(browser, settings={}) {
   page.on('pageerror', error => errors.push(error.message));
   const calls = [];
   const mode = {stationsError:false, slowPremium:false, searchErrorCount:0, routeError:false};
-  await page.route('https://fonts.googleapis.com/**', route=>route.fulfill({contentType:'text/css',body:''}));
-  await page.route('https://fonts.gstatic.com/**', route=>route.abort());
-  await page.route('https://unpkg.com/leaflet@1.9.4/dist/**', route=>{
-    const filename = new URL(route.request().url()).pathname.split('/dist/')[1];
-    const assetPath = path.join(LEAFLET_DIST, filename);
-    if (!fs.existsSync(assetPath)) return route.abort();
-    return route.fulfill({body:fs.readFileSync(assetPath),contentType:filename.endsWith('.js')?'application/javascript':filename.endsWith('.css')?'text/css':'image/png'});
-  });
   await page.route('https://*.tile.openstreetmap.org/**', route=>route.fulfill({contentType:'image/png',body:png}));
-  await page.route('https://api.qrserver.com/**', route=>route.fulfill({contentType:'image/png',body:png}));
   function stationsFor(lat,lng,tipo='regular') {
     const stations = [
       {id:'a', name:'Servicio Centro',cre:'PL/001',lat:lat+.001,lng:lng+.001,regular:25.1,premium:27.2,distance:1.2,desvioKm:.8},
@@ -66,14 +56,14 @@ async function fixturePage(browser, settings={}) {
       const {stations,mejor} = stationsFor(lat,lng,tipo);
       await sleep(mode.slowPremium&&tipo==='premium'?900:250);
       if (mode.stationsError) return route.fulfill({status:502,json:{error:'No se pudieron leer los datos oficiales de la CNE.'}});
-      return route.fulfill({json:{tipo,radioKm:Number(url.searchParams.get('radio')),totalZona:3,promedioZona:25.7,cercanas:stations,baratas:stations,mejor,masCercana:stations[0]}});
+      return route.fulfill({json:{updatedAt:'2026-10-09T12:00:00.000Z',tipo,radioKm:Number(url.searchParams.get('radio')),totalZona:3,promedioZona:25.7,cercanas:stations,baratas:stations,mejor,masCercana:stations[0]}});
     }
     if (url.pathname==='/api/ruta') {
       await sleep(350);
       if (mode.routeError) return route.fulfill({status:502,json:{error:'No se pudo calcular la ruta ahora.'}});
       const lat=Number(url.searchParams.get('fromLat')),lng=Number(url.searchParams.get('fromLng'));
       const {stations,mejor}=stationsFor(lat,lng,tipo);
-      return route.fulfill({json:{tipo,distanciaKm:60,duracionMin:75,geometry:[[lng,lat],[Number(url.searchParams.get('toLng')),Number(url.searchParams.get('toLat'))]],estaciones:stations,mejor,totalEnRuta:3}});
+      return route.fulfill({json:{distanciaKm:60,duracionMin:75,geometry:[[lng,lat],[Number(url.searchParams.get('toLng')),Number(url.searchParams.get('toLat'))]],estaciones:stations,mejor}});
     }
     return route.continue();
   });
@@ -214,6 +204,7 @@ async function swipe(page, locator, dx, dy=0) {
       mode.stationsError=false;
       await refresh.click();
       await expect(refresh).toHaveAttribute('data-state','success');
+      await expect(page.locator('.data-stamp')).toContainText('Consulta del catálogo CNE');
       mode.slowPremium=true;
       await page.getByRole('button',{name:'Premium',exact:true}).click();
       await page.getByRole('button',{name:'Magna',exact:true}).click();
@@ -266,7 +257,7 @@ async function swipe(page, locator, dx, dy=0) {
       await page.getByRole('tab',{name:'Comparar',exact:true}).click();
       await page.getByRole('tab',{name:'Mapa',exact:true}).click();
       await zoom.waitFor();
-      assert.equal(await page.locator('script[src*="leaflet.js"]').count(),1);
+      assert.equal(await page.evaluate(()=>window.L?.version),'1.9.4');
     });
     await check('GPS: estados, error, reintento y ciudad elegida durante una lectura',async()=>{
       await page.evaluate(()=>{
@@ -399,14 +390,16 @@ async function swipe(page, locator, dx, dy=0) {
 
     const mapFailure=await fixturePage(browser);
     currentPage=mapFailure.page;
-    await check('Mapa: fallo de CDN comunicado y reintento con foco recuperado',async()=>{
+    await check('Mapa: fallo del bundle local comunicado y reintento con foco recuperado',async()=>{
       const p=mapFailure.page;
       await selectOrigin(p);
-      await p.route('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', route=>route.abort());
+      await p.evaluate(()=>{
+        Object.defineProperty(window,'L',{configurable:true,get(){throw new Error('No se pudo cargar el mapa local');}});
+      });
       await p.getByRole('tab',{name:'Mapa',exact:true}).click();
       await expect(p.locator('.app-shell').getByRole('alert')).toContainText('No se pudo cargar el mapa');
       await axe(p,'fallo del mapa');
-      await p.route('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', route=>route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(LEAFLET_DIST,'leaflet.js'))}));
+      await p.evaluate(()=>delete window.L);
       await p.getByRole('button',{name:'Reintentar mapa',exact:true}).click();
       await p.getByRole('button',{name:'Acercar mapa',exact:true}).waitFor();
       await expect(p.getByRole('region',{name:'Mapa de gasolineras',exact:true})).toBeFocused();
@@ -503,7 +496,7 @@ async function swipe(page, locator, dx, dy=0) {
     });
     await install.context.close();
     assert.deepEqual(errors,[],'No browser runtime errors');
-    console.log(`\n${checks} comprobaciones de navegador aprobadas; sin errores de React/JS. APIs y recursos externos simulados de forma determinista; Leaflet real 1.9.4.`);
+    console.log(`\n${checks} comprobaciones de navegador aprobadas; sin errores de React/JS. APIs y teselas externas simuladas de forma determinista; Leaflet local 1.9.4.`);
   } catch(error) {
     if(currentPage&&!currentPage.isClosed()) {
       await currentPage.screenshot({path:path.join(OUTPUT, 'browser-failure.png'),fullPage:true}).catch(()=>{});
