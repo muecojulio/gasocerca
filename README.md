@@ -9,8 +9,9 @@ Aplicación para encontrar gasolineras en México y comparar gasolina Magna (tip
 - Destino con ruta por carretera; se conserva el destino y se destaca la estación más barata del camino.
 - Mapa Leaflet con teselas de OpenStreetMap.
 - Comparación de precios y estimación de ahorro para un tanque de 40 L.
+- Pestañas principales para consultar estaciones, ruta, mapa, comparación, privacidad e instalación/QR.
 - PWA instalable; el QR de instalación se genera localmente en el dispositivo.
-- Política de privacidad en `/privacidad`.
+- Política de privacidad disponible en la pestaña y en `/privacidad`.
 
 ## Datos e integraciones
 

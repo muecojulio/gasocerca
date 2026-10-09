@@ -6,6 +6,8 @@ import { FUELS, money, RADIOS, routeMapsUrl, searchPlaces, SECTIONS } from "../l
 import { normalizeSearch } from "../lib/interactions.mjs";
 import StationCard from "./components/StationCard";
 import StationMap from "./components/StationMap";
+import InstallPanel from "./components/InstallPanel";
+import PrivacyContent from "./components/PrivacyContent";
 import CardCarousel from "./components/interactions/CardCarousel";
 import Disclosure from "./components/interactions/Disclosure";
 import FeedbackButton, { FeedbackMessage } from "./components/interactions/FeedbackButton";
@@ -184,19 +186,20 @@ export default function HomePage() {
         </div>
       </CardCarousel>
     </>,
+    privacidad: <div className="legal-content">
+      <h2 className="section-heading">Política de privacidad</h2>
+      <PrivacyContent headingLevel="h3" />
+    </div>,
+    instalar: <InstallPanel />,
   };
 
   return (
     <main className="app-shell">
-      <a className="skip-link" href={`#section-panel-${tab}`}>Saltar a los resultados</a>
+      <a className="skip-link" href={`#section-panel-${tab}`}>Saltar a la sección seleccionada</a>
       <header className="topbar">
         <div className="brand">
           <img src="/icon-192.png" alt="" width="42" height="42" />
           <div><h1>GasoCerca</h1><p>Precios oficiales en México</p></div>
-        </div>
-        <div className="top-links">
-          <Link className="ghost" href="/privacidad">Privacidad</Link>
-          <Link className="ghost" href="/instalar">Instalar / QR</Link>
         </div>
       </header>
 
