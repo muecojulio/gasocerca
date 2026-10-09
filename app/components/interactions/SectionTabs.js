@@ -30,9 +30,9 @@ export default function SectionTabs({ items, value, onChange }) {
   }
 
   return (
-    <nav className="section-tabs" aria-label="Secciones de resultados">
+    <nav className="section-tabs" aria-label="Secciones de GasoCerca">
       <ScrollRail
-        label="Secciones de resultados" role="tablist" showLabel={false} hint
+        label="Secciones de GasoCerca" role="tablist" showLabel={false} hint
         viewportRef={ref} viewportClassName="tabs-rail" selectedKey={value} onKeyDown={onKeyDown}
         indicator={<span className="tab-indicator" aria-hidden="true" style={{ width: indicator.width, transform: `translateX(${indicator.left}px)`, opacity: indicator.width ? 1 : 0 }} />}
       >

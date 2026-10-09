@@ -54,7 +54,7 @@ input, select, textarea { font-size: 1rem; }
 }
 .skip-link:focus { transform: none; clip-path: none; }
 .app-shell { width: min(1120px, 100%); min-width: 0; margin: 0 auto; padding: 22px 20px calc(140px + env(safe-area-inset-bottom)); }
-.topbar, .brand, .top-links, .actions, .card-top, .card-actions {
+.topbar, .brand, .actions, .card-top, .card-actions {
   display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
 }
 .topbar { justify-content: space-between; margin-bottom: 20px; gap: 12px; }
@@ -63,8 +63,6 @@ input, select, textarea { font-size: 1rem; }
 .brand h1 { color: var(--ink); font-size: 1.2rem; line-height: 1.1; font-weight: 900; letter-spacing: -0.04em; }
 .brand p, .meta, .notice { color: var(--muted); font-size: 0.8rem; }
 .brand p { margin-top: 3px; }
-.top-links { gap: 8px; }
-.top-links a { font-size: 0.8rem; min-height: 42px; }
 
 /* One interaction vocabulary for buttons, links, chips, options and tabs. */
 .ghost, .primary, .chip, .tab, .suggestion, .card-actions a {
@@ -318,15 +316,16 @@ button[data-state="error"] .feedback-icon, .error > .feedback-icon { border: 1px
 .site-footer-links a:hover { background: rgba(255, 255, 255, 0.75); text-decoration: underline; }
 
 .legal { max-width: 920px; }
-.legal h1 { margin: 4px 0 8px; color: var(--ink); font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -0.05em; }
-.legal > p.notice { margin: 0 0 16px; }
-.legal h2 { color: var(--ink); font-size: 1.02rem; font-weight: 900; margin-bottom: 8px; }
-.legal ul { margin: 8px 0 0 20px; color: var(--muted); }
-.legal li + li { margin-top: 5px; }
-.legal .card { padding: 18px 20px; border-radius: 18px; box-shadow: 0 6px 18px rgba(24, 55, 62, 0.06); }
-.legal .card p, .legal .card li { font-size: 0.9rem; }
-.legal .card p + p { margin-top: 9px; }
-.legal .notice-card { border-left: 6px solid var(--coral); background: #fff1dd; }
+.legal-content { max-width: 920px; margin-inline: auto; }
+.legal h1, .legal-content > h1 { margin: 4px 0 8px; color: var(--ink); font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -0.05em; }
+.legal-content > p.notice { margin: 0 0 16px; }
+.legal-content .card h2, .legal-content .card h3 { color: var(--ink); font-size: 1.02rem; font-weight: 900; margin-bottom: 8px; }
+.legal-content ul { margin: 8px 0 0 20px; color: var(--muted); }
+.legal-content li + li { margin-top: 5px; }
+.legal-content .card { padding: 18px 20px; border-radius: 18px; box-shadow: 0 6px 18px rgba(24, 55, 62, 0.06); }
+.legal-content .card p, .legal-content .card li { font-size: 0.9rem; }
+.legal-content .card p + p { margin-top: 9px; }
+.legal-content .notice-card { border-left: 6px solid var(--coral); background: #fff1dd; }
 .legal-back { margin-top: 16px; }
 .install-card { position: relative; overflow: hidden; text-align: center; padding: clamp(22px, 5vw, 42px); border: 2px solid #dce2d4; border-radius: 30px; background: radial-gradient(280px 210px at 90% 8%, rgba(255, 200, 87, 0.25), transparent 75%), #fffefa; box-shadow: var(--shadow); }
 .install-card::before { content: "✦  ✷  ✦"; display: block; color: var(--coral); font-size: 1.1rem; letter-spacing: 1.2rem; margin: -6px 0 12px; }
@@ -357,8 +356,6 @@ button[data-state="error"] .feedback-icon, .error > .feedback-icon { border: 1px
   .hero .actions > button { flex: 1 1 180px; }
   .destination-fields { flex-direction: column; }
   .route-button { margin-top: 0; width: 100%; }
-  .top-links { gap: 6px; }
-  .top-links a { padding-inline: 10px; }
 }
 @media (max-width: 430px) {
   .app-shell { padding-inline: 11px; }
@@ -366,8 +363,6 @@ button[data-state="error"] .feedback-icon, .error > .feedback-icon { border: 1px
   .brand { gap: 9px; }
   .brand img { width: 42px; height: 42px; }
   .brand p { font-size: 0.69rem; }
-  .top-links { flex-direction: column; align-items: flex-end; }
-  .top-links a { min-height: 36px; padding: 6px 9px; font-size: 0.7rem; }
   .hero { padding: 16px 14px; }
   .hero-kicker { font-size: 0.61rem; }
   .stats { gap: 6px; }

@@ -124,7 +124,7 @@ async function swipe(page, locator, dx, dy=0) {
       await expect(fuels.getByText('Diésel',{exact:true})).toHaveCount(0);
     });
     await check('Pestañas: semántica, flechas, Inicio/Fin y foco itinerante',async()=>{
-      await expect(page.getByRole('tab')).toHaveCount(5);
+      await expect(page.getByRole('tab')).toHaveCount(7);
       await expect(page.getByRole('tablist')).toHaveCount(1);
       await expect(page.getByRole('tabpanel')).toHaveCount(1);
       const first=page.getByRole('tab',{name:'Más cercanas',exact:true});
@@ -133,13 +133,26 @@ async function swipe(page, locator, dx, dy=0) {
       await expect(page.getByRole('tab',{name:'Más baratas',exact:true})).toHaveAttribute('aria-selected','true');
       await expect(page.getByRole('tab',{name:'Más baratas',exact:true})).toBeFocused();
       await page.keyboard.press('End');
-      await expect(page.getByRole('tabpanel',{name:'Comparar',exact:true})).toBeVisible();
+      await expect(page.getByRole('tabpanel',{name:'Instalar / QR',exact:true})).toBeVisible();
       await page.keyboard.press('Home');
       await expect(first).toHaveAttribute('tabindex','0');
       assert.equal(await page.locator('[role=tab][tabindex="0"]').count(),1);
       await page.keyboard.press('ArrowLeft');
-      await expect(page.getByRole('tab',{name:'Comparar',exact:true})).toBeFocused();
+      await expect(page.getByRole('tab',{name:'Instalar / QR',exact:true})).toBeFocused();
       await page.keyboard.press('Home');
+    });
+    await check('Privacidad e instalar/QR están en las pestañas principales, no en el encabezado',async()=>{
+      await expect(page.locator('.topbar').getByRole('link')).toHaveCount(0);
+      await page.getByRole('tab',{name:'Privacidad',exact:true}).click();
+      const privacyPanel=page.getByRole('tabpanel',{name:'Privacidad',exact:true});
+      await expect(privacyPanel.getByRole('heading',{name:'Política de privacidad',exact:true})).toBeVisible();
+      await expect(privacyPanel).toContainText('Última actualización: 9 de octubre de 2026');
+      await axe(page,'pestaña de privacidad');
+      await page.getByRole('tab',{name:'Instalar / QR',exact:true}).click();
+      const installPanel=page.getByRole('tabpanel',{name:'Instalar / QR',exact:true});
+      await expect(installPanel.getByRole('button',{name:'Instalar en este dispositivo',exact:true})).toBeVisible();
+      await expect(installPanel.getByRole('button',{name:'Copiar enlace',exact:true})).toBeVisible();
+      await axe(page,'pestaña instalar/QR');
     });
     await check('Combobox: acentos, carga, navegación completa y selección',async()=>{
       const input=page.getByRole('combobox',{name:'Origen',exact:true});
@@ -340,7 +353,7 @@ async function swipe(page, locator, dx, dy=0) {
       const first=m.getByRole('tab',{name:'Más cercanas',exact:true});
       await first.focus();
       await first.press('End');
-      const last=m.getByRole('tab',{name:'Comparar',exact:true});
+      const last=m.getByRole('tab',{name:'Instalar / QR',exact:true});
       await expect(last).toHaveAttribute('aria-selected','true');
       await expect.poll(async()=>last.evaluate(node=>{
         const item=node.getBoundingClientRect(), rail=node.parentElement.getBoundingClientRect();
